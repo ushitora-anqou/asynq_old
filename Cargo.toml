@@ -10,3 +10,4 @@ edition = "2018"
 tokio = { version = "0.2", features = ["full"] }
 rusoto_core = "0.44.0"
 rusoto_s3 = "0.44.0"
+async-trait = "0.1.35"
