@@ -3,6 +3,7 @@ use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, PutObjectRequest, S3Client, S3};
 use std::{env, str::FromStr};
 use tokio::io::AsyncReadExt;
+use chrono::{Utc, DateTime};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum GetFileError {
@@ -17,6 +18,8 @@ enum PutFileError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct File {
     body: Vec<u8>,
+    create_datetime: DateTime<Utc>,
+    modify_datetime: DateTime<Utc>
 }
 
 #[async_trait]
@@ -86,9 +89,15 @@ async fn main() {
     let storage = S3Storage::new(region, bucket);
     let src_file = File {
         body: "hogehoge".to_string().into_bytes(),
+        create_datetime: Utc::now(),
+        modify_datetime: Utc::now()
     };
+
     let mut dst_file = File {
         body: "".to_string().into_bytes(),
+        //TODO: These attributes must be retrieved from file meta info.
+        create_datetime: Utc::now(),
+        modify_datetime: Utc::now()
     };
     storage
         .put_file("journal/hoge".to_string(), &src_file)

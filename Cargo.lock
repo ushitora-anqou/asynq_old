@@ -43,6 +43,7 @@ name = "asynq"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "rusoto_core",
  "rusoto_s3",
  "tokio",
