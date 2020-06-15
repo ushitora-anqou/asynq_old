@@ -1,9 +1,9 @@
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, PutObjectRequest, S3Client, S3};
 use std::{env, str::FromStr};
 use tokio::io::AsyncReadExt;
-use chrono::{Utc, DateTime};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum GetFileError {
@@ -20,7 +20,7 @@ struct File {
     path: String,
     body: Vec<u8>,
     create_datetime: DateTime<Utc>,
-    modify_datetime: DateTime<Utc>
+    modify_datetime: DateTime<Utc>,
 }
 
 #[async_trait]
@@ -92,7 +92,7 @@ async fn main() {
         path: "/hoge".to_string(),
         body: "hogehoge".to_string().into_bytes(),
         create_datetime: Utc::now(),
-        modify_datetime: Utc::now()
+        modify_datetime: Utc::now(),
     };
 
     let mut dst_file = File {
@@ -100,7 +100,7 @@ async fn main() {
         //TODO: These attributes must be retrieved from file meta info.
         path: "/hoge".to_string(),
         create_datetime: Utc::now(),
-        modify_datetime: Utc::now()
+        modify_datetime: Utc::now(),
     };
     storage
         .put_file("journal/hoge".to_string(), &src_file)
