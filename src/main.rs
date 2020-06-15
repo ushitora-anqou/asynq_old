@@ -17,13 +17,8 @@ enum PutFileError {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct File {
-    info: FileMetaInfo,
-    body: Vec<u8>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct FileMetaInfo {
     path: String,
+    body: Vec<u8>,
     create_datetime: DateTime<Utc>,
     modify_datetime: DateTime<Utc>
 }
@@ -94,23 +89,18 @@ async fn main() {
 
     let storage = S3Storage::new(region, bucket);
     let src_file = File {
+        path: "/hoge".to_string(),
         body: "hogehoge".to_string().into_bytes(),
-        info: FileMetaInfo {
-            path: "/hoge".to_string(),
-            create_datetime: Utc::now(),
-            modify_datetime: Utc::now()
-        }
+        create_datetime: Utc::now(),
+        modify_datetime: Utc::now()
     };
 
     let mut dst_file = File {
         body: "".to_string().into_bytes(),
-
         //TODO: These attributes must be retrieved from file meta info.
-        info: FileMetaInfo {
-            path: "/hoge".to_string(),
-            create_datetime: Utc::now(),
-            modify_datetime: Utc::now()
-        }
+        path: "/hoge".to_string(),
+        create_datetime: Utc::now(),
+        modify_datetime: Utc::now()
     };
     storage
         .put_file("journal/hoge".to_string(), &src_file)
