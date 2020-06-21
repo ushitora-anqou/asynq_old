@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, PutObjectRequest, S3Client, S3};
+use std::collections::HashMap;
 use std::{env, str::FromStr};
 use tokio::io::AsyncReadExt;
 
@@ -50,10 +51,17 @@ impl StorageEntity for S3Storage {
         request.bucket = self.bucket.clone();
         request.key = path;
         request.body = Some(file.body.clone().into());
+
+        let mut map = HashMap::new();
+        map.insert("create_datetime".to_string(), file.create_datetime.to_rfc3339());
+        map.insert("modify_datetime".to_string(), file.modify_datetime.to_rfc3339());
+        request.metadata = Some(map);
+
         self.client
             .put_object(request)
             .await
             .map_err(|e| PutFileError::RusotoFail(format!("{}", e)))?;
+
         Ok(())
     }
 
@@ -61,16 +69,29 @@ impl StorageEntity for S3Storage {
         let mut request = GetObjectRequest::default();
         request.bucket = self.bucket.clone();
         request.key = path;
-        self.client
+        let result = self
+            .client
             .get_object(request)
             .await
-            .map_err(|e| GetFileError::RusotoFail(format!("{}", e)))?
+            .map_err(|e| GetFileError::RusotoFail(format!("{}", e)))?;
+
+        result
             .body
             .ok_or(GetFileError::RusotoFail("body is empty".to_string()))?
             .into_async_read()
             .read_to_end(&mut file.body)
             .await
             .map_err(|e| GetFileError::RusotoFail(format!("Can't read body: {}", e)))?;
+
+        let metadata = result.metadata.unwrap();
+        file.create_datetime =
+            DateTime::parse_from_rfc3339(metadata.get("create_datetime").unwrap())
+                .unwrap()
+                .with_timezone(&Utc);
+        file.modify_datetime =
+            DateTime::parse_from_rfc3339(metadata.get("modify_datetime").unwrap())
+                .unwrap()
+                .with_timezone(&Utc);
 
         Ok(())
     }
@@ -97,7 +118,6 @@ async fn main() {
 
     let mut dst_file = File {
         body: "".to_string().into_bytes(),
-        //TODO: These attributes must be retrieved from file meta info.
         path: "/hoge".to_string(),
         create_datetime: Utc::now(),
         modify_datetime: Utc::now(),
