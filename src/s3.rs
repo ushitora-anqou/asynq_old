@@ -1,6 +1,7 @@
 use crate::aqfs;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use futures;
 use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, ListObjectsV2Request, PutObjectRequest, S3Client, S3};
 use std::{env, str::FromStr};
@@ -38,23 +39,47 @@ impl aqfs::File for File {
 #[async_trait(?Send)]
 impl aqfs::StorageEntity for Storage {
     async fn list_filemetas(&self) -> Result<Vec<aqfs::FileMeta>, aqfs::Error> {
+        // Get list of journal files (objects) from S3.
         let mut request = ListObjectsV2Request::default();
         request.bucket = self.bucket.clone();
-        let meta = self
+        request.prefix = Some("journal/".to_string());
+        // FIXME: Use request.start_after to get the latest journal files.
+        let mut journal_objects = self
             .client
             .list_objects_v2(request)
             .await
             .map_err(|e| aqfs::Error::Unexpected(format!("Rusoto failed: {}", e)))?
             .contents
-            .ok_or(aqfs::Error::Unexpected(format!("Rusoto failed")))?
+            .ok_or(aqfs::Error::Unexpected(format!("Rusoto failed")))?;
+        // Sort by its name.
+        journal_objects.sort_by_key(|o| o.key.clone().unwrap());
+        // Fetch all journal objects from S3 in parallel.
+        let futures = journal_objects
             .into_iter()
-            .map(|o| aqfs::FileMeta {
-                path: aqfs::Path::new(vec![o.key.expect("hoge")]),
-                create_datetime: Utc::now(),
-                modify_datetime: Utc::now(),
+            .map(|o| {
+                let mut request = GetObjectRequest::default();
+                request.bucket = self.bucket.clone();
+                request.key = o.key.unwrap();
+                self.client.get_object(request)
             })
-            .collect();
-        Ok(meta)
+            .collect::<Vec<_>>();
+        let outputs = futures::future::try_join_all(futures)
+            .await
+            .map_err(|e| aqfs::Error::Unexpected(format!("Rusoto failed: {}", e)))?;
+        // Join all journals into one string.
+        let mut journal = String::new();
+        for o in outputs.into_iter() {
+            o.body
+                .unwrap()
+                .into_async_read()
+                .read_to_string(&mut journal)
+                .await
+                .map_err(|e| aqfs::Error::Unexpected(format!("Rusoto failed: {}", e)))?;
+        }
+        // FIXME: Parse the journal to get Vec<aqfs::FileMeta>.
+        let journal = journal;
+        println!("{:?}", journal);
+        Err(aqfs::Error::Unexpected("".to_string()))
     }
 
     async fn fetch_file(&self, meta: &aqfs::FileMeta) -> Result<Box<dyn aqfs::File>, aqfs::Error> {
