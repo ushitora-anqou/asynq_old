@@ -3,6 +3,7 @@ mod s3;
 
 use crate::aqfs::StorageEntity;
 
+use chrono::Utc;
 use rusoto_core::Region;
 use std::{env, str::FromStr};
 
@@ -18,5 +19,17 @@ async fn main() {
     let bucket = env::var("S3_BUCKET").unwrap_or("asynq".to_string());
 
     let cloud = s3::Storage::new(region, bucket);
+    cloud
+        .create_file(&mut aqfs::RamFile::new(
+            aqfs::FileMeta {
+                path: aqfs::Path::new(vec!["hogehogehoge".to_string()]),
+                create_datetime: Utc::now(),
+                modify_datetime: Utc::now(),
+            },
+            "piyopiyopiyo".to_string().into_bytes(),
+        ))
+        .await
+        .unwrap();
+
     println!("{:?}", cloud.list_filemetas().await.unwrap());
 }

@@ -13,3 +13,4 @@ rusoto_core = "0.44.0"
 rusoto_s3 = "0.44.0"
 async-trait = "0.1.35"
 chrono = "0.4.11"
+uuid = { version = "0.8", features = ["v4"] }
