@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Error {
@@ -9,9 +10,10 @@ pub enum Error {
 
     // For s3
     RusotoFail(String),
+    SerdeFail(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Path {
     elms: Vec<String>,
 }
@@ -28,7 +30,7 @@ impl ToString for Path {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FileMeta {
     pub path: Path,
     pub create_datetime: DateTime<Utc>,
