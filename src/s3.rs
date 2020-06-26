@@ -92,21 +92,28 @@ impl Storage {
             .await
             .map_err(|e| aqfs::Error::RusotoFail(format!("Failed in PutObject: {}", e)))
     }
+
+    async fn list_objects_v2(
+        &self,
+        prefix: String,
+    ) -> Result<rusoto_s3::ListObjectsV2Output, aqfs::Error> {
+        let mut request = ListObjectsV2Request::default();
+        request.bucket = self.bucket.clone();
+        request.prefix = Some(prefix);
+        self.client
+            .list_objects_v2(request)
+            .await
+            .map_err(|e| aqfs::Error::RusotoFail(format!("Failed in ListObjectsV2: {}", e)))
+    }
 }
 
 #[async_trait(?Send)]
 impl aqfs::StorageEntity for Storage {
     async fn list_filemetas(&self) -> Result<Vec<aqfs::FileMeta>, aqfs::Error> {
         // Get list of journal files (objects) from S3.
-        let mut request = ListObjectsV2Request::default();
-        request.bucket = self.bucket.clone();
-        request.prefix = Some("journal/".to_string());
-        // FIXME: Use request.start_after to get the latest journal files.
         let mut journal_objects = self
-            .client
-            .list_objects_v2(request)
-            .await
-            .map_err(|e| aqfs::Error::RusotoFail(format!("Failed in ListObjectsV2: {}", e)))?
+            .list_objects_v2("journal/".to_string())
+            .await?
             .contents
             .ok_or(aqfs::Error::RusotoFail(
                 "Failed in ListObjectsV2: Can't read the content".to_string(),
@@ -194,5 +201,50 @@ impl aqfs::StorageEntity for Storage {
 
     async fn create_dir(&self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
         Err(aqfs::Error::NotImplemented)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::aqfs::StorageEntity;
+
+    async fn get_test_storage() -> Storage {
+        let region = Region::Custom {
+            name: "s3-asynq-test".to_string(),
+            endpoint: "http://localhost:9000".to_string(),
+        };
+        let bucket = format!("asynq-test-{}", Uuid::new_v4().to_simple());
+        let client = S3Client::new(region.clone());
+
+        // create new bucket.
+        let mut request = rusoto_s3::CreateBucketRequest::default();
+        request.bucket = bucket.clone();
+        client
+            .create_bucket(request)
+            .await
+            .expect("No connection to S3");
+
+        Storage::new(region, bucket)
+    }
+
+    #[tokio::test]
+    async fn create_file_works() -> Result<(), aqfs::Error> {
+        let cloud = get_test_storage().await;
+
+        cloud
+            .create_file(&mut aqfs::RamFile::new(
+                aqfs::FileMeta {
+                    path: aqfs::Path::new(vec!["dummy-path".to_string()]),
+                    create_datetime: Utc::now(),
+                    modify_datetime: Utc::now(),
+                },
+                "dummy content".to_string().into_bytes(),
+            ))
+            .await?;
+
+        cloud.list_filemetas().await?;
+
+        Ok(())
     }
 }
