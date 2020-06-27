@@ -16,3 +16,5 @@ chrono = "0.4.11"
 uuid = { version = "0.8", features = ["v4"] }
 serde = "1.0.114"
 bincode = "1.2.1"
+filetime = "0.2"
+tempfile = "3"
