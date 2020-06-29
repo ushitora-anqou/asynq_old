@@ -59,11 +59,9 @@ impl aqfs::StorageEntity for Storage {
                 }
                 let metadata = entry.metadata().ok()?;
                 let file_name = entry.file_name().into_string().ok()?;
-                let ctime = DateTime::<Utc>::from(metadata.created().ok()?);
                 let mtime = DateTime::<Utc>::from(metadata.modified().ok()?);
                 Some(aqfs::FileMeta {
                     path: aqfs::Path::new(vec![file_name]),
-                    ctime,
                     mtime,
                 })
             })
@@ -121,7 +119,6 @@ mod test {
             .create_file(&mut aqfs::RamFile::new(
                 aqfs::FileMeta {
                     path: aqfs::Path::new(vec!["dummy-path".to_string()]),
-                    ctime: Utc.timestamp(0, 0),
                     mtime: Utc.timestamp(0, 0),
                 },
                 "dummy content".to_string().into_bytes(),

@@ -231,7 +231,6 @@ mod test {
             .create_file(&mut aqfs::RamFile::new(
                 aqfs::FileMeta {
                     path: aqfs::Path::new(vec!["dummy-path".to_string()]),
-                    ctime: Utc::now(),
                     mtime: Utc::now(),
                 },
                 "dummy content".to_string().into_bytes(),
