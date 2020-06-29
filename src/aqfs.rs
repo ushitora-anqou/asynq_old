@@ -49,7 +49,6 @@ impl ToString for Path {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FileMeta {
     pub path: Path,
-    pub ctime: DateTime<Utc>,
     pub mtime: DateTime<Utc>,
 }
 

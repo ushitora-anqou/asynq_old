@@ -45,10 +45,12 @@ dependencies = [
  "async-trait",
  "bincode",
  "chrono",
+ "filetime",
  "futures",
  "rusoto_core",
  "rusoto_s3",
  "serde",
+ "tempfile",
  "tokio",
  "uuid",
 ]
@@ -257,6 +259,18 @@ name = "fake-simd"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
+
+[[package]]
+name = "filetime"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "affc17579b132fc2461adf7c575cc6e8b134ebca52c51f5411388965227dc695"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "redox_syscall",
+ "winapi 0.3.8",
+]
 
 [[package]]
 name = "fnv"
