@@ -113,7 +113,7 @@ impl Storage {
 
 #[async_trait(?Send)]
 impl aqfs::StorageEntity for Storage {
-    async fn list_filemetas(&self) -> Result<Vec<aqfs::FileMeta>, aqfs::Error> {
+    async fn list_filemetas(&mut self) -> Result<Vec<aqfs::FileMeta>, aqfs::Error> {
         // Get list of journal files (objects) from S3.
         let mut journal_objects = self
             .list_objects_v2("journal/".to_string())
@@ -157,11 +157,14 @@ impl aqfs::StorageEntity for Storage {
         Ok(metas)
     }
 
-    async fn fetch_file(&self, _meta: &aqfs::FileMeta) -> Result<Box<dyn aqfs::File>, aqfs::Error> {
+    async fn fetch_file(
+        &mut self,
+        _meta: &aqfs::FileMeta,
+    ) -> Result<Box<dyn aqfs::File>, aqfs::Error> {
         Err(aqfs::Error::NotImplemented)
     }
 
-    async fn create_file(&self, file: &mut impl aqfs::File) -> Result<(), aqfs::Error> {
+    async fn create_file(&mut self, file: &mut impl aqfs::File) -> Result<(), aqfs::Error> {
         // Upload the file's content.
         let key = format!("data/{}", Uuid::new_v4().to_simple().to_string());
         self.put_object(key.clone(), Some(file.read_all().await?.into()))
@@ -190,11 +193,11 @@ impl aqfs::StorageEntity for Storage {
         Ok(())
     }
 
-    async fn remove_file(&self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
+    async fn remove_file(&mut self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
         Err(aqfs::Error::NotImplemented)
     }
 
-    async fn create_dir(&self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
+    async fn create_dir(&mut self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
         Err(aqfs::Error::NotImplemented)
     }
 }
@@ -225,7 +228,7 @@ mod test {
 
     #[tokio::test]
     async fn works() -> Result<(), aqfs::Error> {
-        let cloud = get_test_storage().await;
+        let mut cloud = get_test_storage().await;
 
         cloud
             .create_file(&mut aqfs::RamFile::new(

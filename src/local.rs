@@ -41,7 +41,7 @@ impl Storage {
 
 #[async_trait(?Send)]
 impl aqfs::StorageEntity for Storage {
-    async fn list_filemetas(&self) -> Result<Vec<aqfs::FileMeta>, aqfs::Error> {
+    async fn list_filemetas(&mut self) -> Result<Vec<aqfs::FileMeta>, aqfs::Error> {
         // FIXME: recursion
         let metas = std::fs::read_dir(&self.root)
             .map_err(|e| {
@@ -69,7 +69,10 @@ impl aqfs::StorageEntity for Storage {
         Ok(metas)
     }
 
-    async fn fetch_file(&self, meta: &aqfs::FileMeta) -> Result<Box<dyn aqfs::File>, aqfs::Error> {
+    async fn fetch_file(
+        &mut self,
+        meta: &aqfs::FileMeta,
+    ) -> Result<Box<dyn aqfs::File>, aqfs::Error> {
         let realpath = self.root.join(std::path::PathBuf::from(&meta.path));
         let file = File {
             meta: meta.clone(),
@@ -78,7 +81,7 @@ impl aqfs::StorageEntity for Storage {
         Ok(Box::new(file))
     }
 
-    async fn create_file(&self, file: &mut impl aqfs::File) -> Result<(), aqfs::Error> {
+    async fn create_file(&mut self, file: &mut impl aqfs::File) -> Result<(), aqfs::Error> {
         // FIXME: Use a temporary file and move it to the correct path.
         let realpath = self.get_real_path(&file.meta().path);
         {
@@ -93,13 +96,13 @@ impl aqfs::StorageEntity for Storage {
         Ok(())
     }
 
-    async fn remove_file(&self, meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
+    async fn remove_file(&mut self, meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
         let realpath = self.get_real_path(&meta.path);
         std::fs::remove_file(realpath)?;
         Ok(())
     }
 
-    async fn create_dir(&self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
+    async fn create_dir(&mut self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
         Err(aqfs::Error::NotImplemented)
     }
 }
@@ -114,7 +117,7 @@ mod test {
     #[tokio::test]
     async fn works() -> Result<(), aqfs::Error> {
         let tmp_dir = TempDir::new()?;
-        let storage = Storage::new(tmp_dir.path().to_path_buf());
+        let mut storage = Storage::new(tmp_dir.path().to_path_buf());
         let metas = storage.list_filemetas().await?;
         assert_eq!(metas.len(), 0);
         storage
