@@ -93,8 +93,10 @@ impl aqfs::StorageEntity for Storage {
         Ok(())
     }
 
-    async fn remove_file(&self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
-        Err(aqfs::Error::NotImplemented)
+    async fn remove_file(&self, meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
+        let realpath = self.get_real_path(&meta.path);
+        std::fs::remove_file(realpath)?;
+        Ok(())
     }
 
     async fn create_dir(&self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
@@ -132,6 +134,10 @@ mod test {
         assert_eq!(metas.len(), 1);
         let bytes = storage.fetch_file(&metas[0]).await?.read_all().await?;
         assert_eq!(std::str::from_utf8(&bytes).unwrap(), "dummy content");
+        storage.remove_file(&metas[0]).await?;
+        let metas = storage.list_filemetas().await?;
+        assert_eq!(metas.len(), 0);
+
         Ok(())
     }
 }
