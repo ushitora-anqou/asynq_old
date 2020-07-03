@@ -52,7 +52,7 @@ pub struct FileMeta {
     pub mtime: DateTime<Utc>,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 pub trait File {
     fn meta(&self) -> &FileMeta;
     async fn read_all(&mut self) -> Result<Vec<u8>, Error>;
@@ -69,7 +69,7 @@ impl RamFile {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl File for RamFile {
     fn meta(&self) -> &FileMeta {
         &self.meta
@@ -81,10 +81,8 @@ impl File for RamFile {
 }
 
 #[async_trait(?Send)]
-pub trait StorageEntity {
-    async fn list_filemetas(&mut self) -> Result<Vec<FileMeta>, Error>;
-    async fn fetch_file(&mut self, meta: &FileMeta) -> Result<Box<dyn File>, Error>;
+pub trait StorageEntity<F: File> {
+    async fn list_files(&mut self) -> Result<Vec<F>, Error>;
     async fn create_file(&mut self, file: &mut impl File) -> Result<(), Error>;
-    async fn remove_file(&mut self, meta: &FileMeta) -> Result<(), Error>;
-    async fn create_dir(&mut self, meta: &FileMeta) -> Result<(), Error>;
+    async fn remove_file(&mut self, file: &F) -> Result<(), Error>;
 }
