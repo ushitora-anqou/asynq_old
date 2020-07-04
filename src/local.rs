@@ -1,4 +1,5 @@
 use crate::aqfs;
+use crate::aqfs::File as FileTrait;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::io::{Read, Write};
@@ -8,7 +9,7 @@ pub struct File {
     realpath: std::path::PathBuf,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl aqfs::File for File {
     fn meta(&self) -> &aqfs::FileMeta {
         &self.meta
@@ -40,8 +41,8 @@ impl Storage {
 }
 
 #[async_trait(?Send)]
-impl aqfs::StorageEntity for Storage {
-    async fn list_filemetas(&self) -> Result<Vec<aqfs::FileMeta>, aqfs::Error> {
+impl aqfs::StorageEntity<File> for Storage {
+    async fn list_files(&mut self) -> Result<Vec<File>, aqfs::Error> {
         // FIXME: recursion
         let metas = std::fs::read_dir(&self.root)
             .map_err(|e| {
@@ -59,26 +60,18 @@ impl aqfs::StorageEntity for Storage {
                 }
                 let metadata = entry.metadata().ok()?;
                 let file_name = entry.file_name().into_string().ok()?;
+                let path = aqfs::Path::new(vec![file_name]);
                 let mtime = DateTime::<Utc>::from(metadata.modified().ok()?);
-                Some(aqfs::FileMeta {
-                    path: aqfs::Path::new(vec![file_name]),
-                    mtime,
+                Some(File {
+                    realpath: self.get_real_path(&path),
+                    meta: aqfs::FileMeta { path, mtime },
                 })
             })
             .collect();
         Ok(metas)
     }
 
-    async fn fetch_file(&self, meta: &aqfs::FileMeta) -> Result<Box<dyn aqfs::File>, aqfs::Error> {
-        let realpath = self.root.join(std::path::PathBuf::from(&meta.path));
-        let file = File {
-            meta: meta.clone(),
-            realpath,
-        };
-        Ok(Box::new(file))
-    }
-
-    async fn create_file(&self, file: &mut impl aqfs::File) -> Result<(), aqfs::Error> {
+    async fn create_file(&mut self, file: &mut impl aqfs::File) -> Result<(), aqfs::Error> {
         // FIXME: Use a temporary file and move it to the correct path.
         let realpath = self.get_real_path(&file.meta().path);
         {
@@ -93,12 +86,9 @@ impl aqfs::StorageEntity for Storage {
         Ok(())
     }
 
-    async fn remove_file(&self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
-        Err(aqfs::Error::NotImplemented)
-    }
-
-    async fn create_dir(&self, _meta: &aqfs::FileMeta) -> Result<(), aqfs::Error> {
-        Err(aqfs::Error::NotImplemented)
+    async fn remove_file(&mut self, file: &File) -> Result<(), aqfs::Error> {
+        std::fs::remove_file(&file.realpath)?;
+        Ok(())
     }
 }
 
@@ -112,9 +102,9 @@ mod test {
     #[tokio::test]
     async fn works() -> Result<(), aqfs::Error> {
         let tmp_dir = TempDir::new()?;
-        let storage = Storage::new(tmp_dir.path().to_path_buf());
-        let metas = storage.list_filemetas().await?;
-        assert_eq!(metas.len(), 0);
+        let mut storage = Storage::new(tmp_dir.path().to_path_buf());
+        let files = storage.list_files().await?;
+        assert_eq!(files.len(), 0);
         storage
             .create_file(&mut aqfs::RamFile::new(
                 aqfs::FileMeta {
@@ -128,10 +118,14 @@ mod test {
             std::fs::metadata(tmp_dir.path().join("dummy-path"))?.modified()?,
             std::time::SystemTime::from(Utc.timestamp(0, 0))
         );
-        let metas = storage.list_filemetas().await?;
-        assert_eq!(metas.len(), 1);
-        let bytes = storage.fetch_file(&metas[0]).await?.read_all().await?;
+        let mut files = storage.list_files().await?;
+        assert_eq!(files.len(), 1);
+        let bytes = files[0].read_all().await?;
         assert_eq!(std::str::from_utf8(&bytes).unwrap(), "dummy content");
+        storage.remove_file(&files[0]).await?;
+        let files = storage.list_files().await?;
+        assert_eq!(files.len(), 0);
+
         Ok(())
     }
 }
