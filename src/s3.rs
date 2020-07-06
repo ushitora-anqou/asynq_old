@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures;
 use rusoto_core::Region;
-use rusoto_s3::{GetObjectRequest, ListObjectsV2Request, PutObjectRequest, S3};
+use rusoto_s3::S3;
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap, env, rc::Rc, str::FromStr};
 use tokio::io::AsyncReadExt;
@@ -36,7 +36,7 @@ impl S3Client {
     }
 
     async fn get_object(&self, key: String) -> Result<rusoto_s3::GetObjectOutput, aqfs::Error> {
-        let mut request = GetObjectRequest::default();
+        let mut request = rusoto_s3::GetObjectRequest::default();
         request.bucket = self.bucket.clone();
         request.key = key;
         Ok(self.client.get_object(request).await?)
@@ -47,7 +47,7 @@ impl S3Client {
         key: String,
         body: Option<rusoto_s3::StreamingBody>,
     ) -> Result<rusoto_s3::PutObjectOutput, aqfs::Error> {
-        let mut request = PutObjectRequest::default();
+        let mut request = rusoto_s3::PutObjectRequest::default();
         request.bucket = self.bucket.clone();
         request.key = key;
         request.body = body;
@@ -58,7 +58,7 @@ impl S3Client {
         &self,
         prefix: String,
     ) -> Result<rusoto_s3::ListObjectsV2Output, aqfs::Error> {
-        let mut request = ListObjectsV2Request::default();
+        let mut request = rusoto_s3::ListObjectsV2Request::default();
         request.bucket = self.bucket.clone();
         request.prefix = Some(prefix);
         Ok(self.client.list_objects_v2(request).await?)
@@ -205,12 +205,15 @@ impl aqfs::StorageEntity<File> for Storage {
             .collect())
     }
 
-    async fn create_file(&mut self, file: &mut impl aqfs::File) -> Result<(), aqfs::Error> {
+    async fn create_file(
+        &mut self,
+        mut file: impl aqfs::File + 'async_trait,
+    ) -> Result<(), aqfs::Error> {
         // Upload the file's content.
         let key = format!("data/{}", Uuid::new_v4().to_simple().to_string());
         self.client
             .borrow()
-            .put_object(key.clone(), Some(file.read_all().await?.into()))
+            .put_object(key.clone(), Some((&mut file).read_all().await?.into()))
             .await?;
 
         // Create journal and put it to journal/.
@@ -292,7 +295,7 @@ mod test {
         let files = storage.list_files().await?;
         assert_eq!(files.len(), 0);
         storage
-            .create_file(&mut aqfs::RamFile::new(
+            .create_file(aqfs::RamFile::new(
                 aqfs::FileMeta {
                     path: aqfs::Path::new(vec!["dummy-path".to_string()]),
                     mtime: Utc.timestamp(0, 0),

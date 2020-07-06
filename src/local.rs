@@ -44,7 +44,7 @@ impl Storage {
 impl aqfs::StorageEntity<File> for Storage {
     async fn list_files(&mut self) -> Result<Vec<File>, aqfs::Error> {
         // FIXME: recursion
-        let metas = std::fs::read_dir(&self.root)
+        let files = std::fs::read_dir(&self.root)
             .map_err(|e| {
                 aqfs::Error::Unexpected(format!(
                     "Can't read directory {}: {}",
@@ -68,10 +68,13 @@ impl aqfs::StorageEntity<File> for Storage {
                 })
             })
             .collect();
-        Ok(metas)
+        Ok(files)
     }
 
-    async fn create_file(&mut self, file: &mut impl aqfs::File) -> Result<(), aqfs::Error> {
+    async fn create_file(
+        &mut self,
+        mut file: impl aqfs::File + 'async_trait,
+    ) -> Result<(), aqfs::Error> {
         // FIXME: Use a temporary file and move it to the correct path.
         let realpath = self.get_real_path(&file.meta().path);
         {
@@ -106,7 +109,7 @@ mod test {
         let files = storage.list_files().await?;
         assert_eq!(files.len(), 0);
         storage
-            .create_file(&mut aqfs::RamFile::new(
+            .create_file(aqfs::RamFile::new(
                 aqfs::FileMeta {
                     path: aqfs::Path::new(vec!["dummy-path".to_string()]),
                     mtime: Utc.timestamp(0, 0),
